@@ -58,6 +58,7 @@ pyramid-authsanity==1.0.0
 pyramid-jinja2==2.6.2
 pyramid-layout==1.0
 pyramid-mailer==0.15.1
+pyramid-retry==0.5
 pyramid-services==0.4
 pyramid-tm==2.2
 pyramid==1.9.1
