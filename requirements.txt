@@ -29,6 +29,7 @@ gevent==1.2.1
 greenlet==0.4.10          # via gevent
 gunicorn==19.6.0
 html5lib==0.999999999     # via bleach
+hupper==1.0               # via pyramid
 idna==2.5                 # via cryptography
 ipaddress==1.0.18         # via cryptography
 iso8601==0.1.11           # via colander
@@ -44,8 +45,10 @@ newrelic==2.68.0.50
 oauthlib==2.0.2
 packaging==16.8           # via cryptography
 passlib==1.7.1
-pastedeploy==1.5.2        # via pyramid
+pastedeploy==1.5.2        # via plaster-pastedeploy, pyramid
 peppercorn==0.5           # via deform
+plaster-pastedeploy==0.4.2  # via pyramid
+plaster==1.0              # via plaster-pastedeploy, pyramid
 psycogreen==1.0
 psycopg2==2.7.3.2
 pycparser==2.14           # via cffi
@@ -57,7 +60,7 @@ pyramid-layout==1.0
 pyramid-mailer==0.15.1
 pyramid-services==0.4
 pyramid-tm==2.2
-pyramid==1.7.3
+pyramid==1.9.1
 python-dateutil==2.5.3
 python-editor==1.0.1      # via alembic
 python-slugify==1.1.4
@@ -76,7 +79,7 @@ unidecode==0.4.19         # via python-slugify
 urllib3==1.16             # via elasticsearch
 venusian==1.0
 webencodings==0.5.1       # via html5lib
-webob==1.6.1              # via pyramid
+webob==1.8.0rc1           # via pyramid
 ws4py==0.4.2
 wsaccel==0.6.2
 zope.deprecation==4.1.2   # via deform, pyramid, pyramid-jinja2
