@@ -131,7 +131,17 @@ class TestSearch(object):
         search.Search(pyramid_request)
 
         assert Builder.call_count == 2
-        Builder.assert_any_call(es_version=client.version)
+        for _, kwargs in Builder.call_args_list:
+            assert kwargs['es_version'] == client.version
+
+    def test_it_passes_searchable_fields_to_builder(self, patch, pyramid_request, Builder):
+        searchable_fields = patch('h.search.config.searchable_fields')
+
+        search.Search(pyramid_request)
+
+        assert Builder.call_count == 2
+        for _, kwargs in Builder.call_args_list:
+            assert kwargs['searchable_fields'] == searchable_fields.return_value
 
     @pytest.fixture
     def Builder(self, patch):

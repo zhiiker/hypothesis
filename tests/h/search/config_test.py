@@ -20,6 +20,7 @@ from h.search.config import (
     configure_index,
     delete_index,
     get_aliased_index,
+    searchable_fields,
     update_aliased_index,
     update_index_settings,
 )
@@ -275,6 +276,13 @@ class TestUpdateIndexSettings(object):
 
         with pytest.raises(RuntimeError):
             update_index_settings(client)
+
+
+class TestSearchableFields(object):
+
+    def test_returns_top_level_indexed_field_names(self, client):
+        fields = searchable_fields(client)
+        assert fields == set(ANNOTATION_MAPPING["properties"].keys())
 
 
 def captures(patterns, text):

@@ -72,6 +72,23 @@ class TestBuilder(object):
         assert query == {"bool": {"filter": [filter_(params)],
                                   "must": []}}
 
+    def test_known_query_params_added_as_key_value_matchers(self, matchers):
+        builder = Builder(es_version=(6, 2, 0),
+                          searchable_fields={"uri", "text"})
+
+        query = builder.build({"uri": "http://example.com",
+                               "uri.parts": "example",   # Nested field.
+                               "text": "sometext",
+                               "unknownparam": "ignoreme"})  # Unknown field.
+
+        def matcher(key, value):
+            return {"match": {key: value}}
+
+        required_terms = matchers.UnorderedList(query["query"]["bool"]["must"])
+        assert required_terms == [matcher("uri", "http://example.com"),
+                                  matcher("uri.parts", "example"),
+                                  matcher("text", "sometext")]
+
 
 class TestTopLevelAnnotationsFilter(object):
 

@@ -394,3 +394,15 @@ def _get_mapping(client):
     if client.version < (2,):
         mapping = ANNOTATION_MAPPING
     return mapping
+
+
+def searchable_fields(client):
+    """
+    Return a set of field names which can be searched in the client's index.
+
+    Note that this only includes top-level fields (eg. "uri" but not "uri.parts").
+
+    :type client: h.search.client.Client
+    :rtype: Set[str]
+    """
+    return set(_get_mapping(client)['properties'].keys())

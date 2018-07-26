@@ -6,7 +6,7 @@ from contextlib import contextmanager
 
 from elasticsearch1.exceptions import ConnectionTimeout
 
-from h.search import query
+from h.search import config, query
 
 log = logging.getLogger(__name__)
 
@@ -154,7 +154,9 @@ class Search(object):
 
     @staticmethod
     def _default_querybuilder(request, es):
-        builder = query.Builder(es_version=es.version)
+        fields = config.searchable_fields(es)
+
+        builder = query.Builder(es_version=es.version, searchable_fields=fields)
         builder.append_filter(query.DeletedFilter())
         builder.append_filter(query.AuthFilter(request))
         builder.append_filter(query.UriFilter(request))

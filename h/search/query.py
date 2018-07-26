@@ -14,18 +14,21 @@ class Builder(object):
     Build a query for execution in Elasticsearch.
     """
 
-    def __init__(self, es_version):
+    def __init__(self, es_version, searchable_fields=None):
         """
         Initialize query builder.
 
         :param es_version: Elasticsearch library version.
         :type es_version: Tuple[int,int,int]
+        :param searchable_fields: Set of field names which can be searched
+        :type searchable_fields: Set[string]
         """
 
         self.filters = []
         self.matchers = []
         self.aggregations = []
         self._es_version = es_version
+        self._searchable_fields = searchable_fields or set()
 
     def append_filter(self, f):
         self.filters.append(f)
@@ -50,9 +53,13 @@ class Builder(object):
         filters = [f for f in filters if f is not None]
         matchers = [m for m in matchers if m is not None]
 
-        # Remaining parameters are added as straightforward key-value matchers
+        # Remaining parameters which match names of searchable fields are added
+        # as straightforward key-value matchers.
         for key, value in params.items():
-            matchers.append({"match": {key: value}})
+            # If this is a nested field (eg. "uri.parts") only check the top-level part.
+            top_level_field, = key.split('.')[:1]
+            if top_level_field in self._searchable_fields:
+                matchers.append({"match": {key: value}})
 
         # Use appropriate filter syntax depending on ES version.
         # See https://www.elastic.co/guide/en/elasticsearch/reference/6.2/query-dsl-filtered-query.html

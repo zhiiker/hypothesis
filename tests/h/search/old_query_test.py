@@ -129,7 +129,7 @@ class TestBuilder(object):
 
     def test_default_param_action(self):
         """Other params are added as "match" clauses."""
-        builder = query.Builder(ES_VERSION)
+        builder = query.Builder(ES_VERSION, searchable_fields={"foo"})
 
         q = builder.build({"foo": "bar"})
 
@@ -137,7 +137,7 @@ class TestBuilder(object):
 
     def test_default_params_multidict(self):
         """Multiple params go into multiple "match" dicts."""
-        builder = query.Builder(ES_VERSION)
+        builder = query.Builder(ES_VERSION, searchable_fields={"user"})
         params = multidict.MultiDict()
         params.add("user", "fred")
         params.add("user", "bob")
