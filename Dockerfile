@@ -10,8 +10,6 @@ ENV NODE_ENV production
 # Expose the default port.
 EXPOSE 5000
 
-RUN npm ci --production && npm run build
-
 # Install system build and runtime dependencies.
 # Create the hypothesis user, group, home directory and package directory.
 # Ensure nginx state and log directories writeable by unprivileged user.
@@ -63,7 +61,7 @@ COPY  scripts/gulp/ ./scripts/gulp/
 COPY  h/static/ ./h/static/
 
 # Install node and python packages and cleanup build deps.
-RUN npm install --production && npm run build \
+RUN npm ci --production && npm run build \
   && pip install --no-cache-dir -r requirements.txt  
 
 # Copy the rest of the application files.
