@@ -311,3 +311,86 @@ def _target_selectors(targets):
         return targets[0]['selector']
     else:
         return []
+
+
+class SearchParamsSchema(JSONSchema):
+    """Validates a JSON payload for an elasticsearch query via API"""
+    schema = {
+        # 'type': 'object',
+        'properties': {
+            '_separate_replies': {
+                'type': 'string',
+            },
+            'authority': {
+                'type': 'string',
+            },
+            'created': {
+                'type': 'date',
+            },
+            'deleted': {
+                'type': 'boolean',
+            },
+            # should we be searching this if it's not indexed?
+            'document': {
+                'type': 'string',  # not indexed
+            },
+            'group': {
+                'type': 'string',
+            },
+            'id': {
+                'type': 'string',
+            },
+            'nipsa': {
+                'type': 'boolean',
+            },
+            'quote': {
+                'type': 'string',
+            },
+            'references': {
+                'type': 'string',
+            },
+            'shared': {
+                'type': 'boolean',
+            },
+            'tag': {
+                'type': 'string',
+            },
+            'tags': {
+                'type': 'string',
+            },
+            'tags_raw': {
+                'type': 'string',
+            },
+            'text': {
+                'type': 'string',
+            },
+            'target': {
+                'type': 'string',
+            },
+            'thread_ids': {
+                'type': 'string',
+            },
+            'updated': {
+                'type': 'date',
+            },
+            'uri': {
+                'type': 'string',
+            },
+            'uri.parts': {
+                'type': 'string',
+            },
+            'url': {
+                'type': 'string',
+            },
+            'any': {
+                'type': 'string',
+            },
+            'user': {
+                'type': 'string',
+            },
+            'user_raw': {
+                'type': 'string',
+            },
+        },
+        'required': [],
+    }
