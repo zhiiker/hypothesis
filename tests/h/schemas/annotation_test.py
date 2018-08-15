@@ -1,12 +1,17 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+from copy import deepcopy
 import mock
 import pytest
 import re
+from webob.multidict import MultiDict
 
 from h.schemas import ValidationError
-from h.schemas.annotation import CreateAnnotationSchema, UpdateAnnotationSchema
+from h.schemas.annotation import (
+    CreateAnnotationSchema,
+    SearchParamsSchema,
+    UpdateAnnotationSchema)
 
 
 def create_annotation_schema_validate(request, data):
@@ -606,6 +611,82 @@ class TestUpdateAnnotationSchema(object):
         document_claims.document_metas_from_data.assert_called_once_with(
             document_data,
             claimant=mock.sentinel.target_uri)
+
+
+class TestSearchParamsSchema(object):
+
+    def test_it_returns_known_params(self, schema):
+        input_params = {
+            '_separate_replies': '1',
+            'group': "group1",
+            'quote': "quote me",
+            'references': "3456TA12",
+            'tag': "tagme",
+            'tags': "[tagme2]",
+            'text': "text me",
+            'uri': "foobar.com",
+            'url': "https://foobar.com",
+            'any': "foo",
+            'user': "pooky",
+            'sort': "created",
+            'limit': "10",
+            'order': "asc",
+            'offset': "0",
+        }
+
+        params = schema.validate(input_params)
+
+        assert params == input_params
+
+    def test_it_ignores_unknown_params(self, schema):
+        expected_params = {
+            '_separate_replies': '1',
+            'group': "group1",
+            'quote': "quote me",
+            'references': "3456TA12",
+            'tag': "tagme",
+            'tags': "[tagme2]",
+            'text': "text me",
+            'uri': "foobar.com",
+            'url': "https://foobar.com",
+            'any': "foo",
+            'user': "pooky",
+            'sort': "created",
+            'limit': "10",
+            'order': "asc",
+            'offset': "0",
+        }
+        unknown_params = {
+            "paramdoesnotexist": "value",
+            "paramnoexiste": "value"}
+        input_params = deepcopy(expected_params)
+        input_params.update(unknown_params)
+
+        params = schema.validate(input_params)
+
+        assert params == expected_params
+
+    def test_it_handles_duplicate_keys(self, schema):
+        expected_params = MultiDict([
+            ("url", "http://foobar"),
+            ("url", "http://foobat")])
+        input_params = deepcopy(expected_params)
+        input_params.add("unknownparam", "foo")
+        input_params.add("unknownparam", "bar")
+
+        params = schema.validate(input_params)
+
+        assert params == expected_params
+
+    def test_raises_if_invalid_sorting_order(self, schema):
+        input_params = {"order": "notrecognized"}
+
+        with pytest.raises(ValidationError):
+            schema.validate(input_params)
+
+    @pytest.fixture
+    def schema(self):
+        return SearchParamsSchema()
 
 
 @pytest.fixture
