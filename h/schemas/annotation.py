@@ -321,27 +321,21 @@ class SearchParamsSchema(JSONSchema):
             '_separate_replies': {
                 'type': 'string',
             },
-            'authority': {
+            'sort': {
                 'type': 'string',
             },
-            'created': {
-                'type': 'date',
+            'limit': {
+                'type': 'string',
             },
-            'deleted': {
-                'type': 'boolean',
+            'order': {
+                'type': 'string',
+                'enum': ["asc", "desc"],
             },
-            # should we be searching this if it's not indexed?
-            'document': {
-                'type': 'string',  # not indexed
+            'offset': {
+                'type': 'string',
             },
             'group': {
                 'type': 'string',
-            },
-            'id': {
-                'type': 'string',
-            },
-            'nipsa': {
-                'type': 'boolean',
             },
             'quote': {
                 'type': 'string',
@@ -349,34 +343,16 @@ class SearchParamsSchema(JSONSchema):
             'references': {
                 'type': 'string',
             },
-            'shared': {
-                'type': 'boolean',
-            },
             'tag': {
                 'type': 'string',
             },
             'tags': {
                 'type': 'string',
             },
-            'tags_raw': {
-                'type': 'string',
-            },
             'text': {
                 'type': 'string',
             },
-            'target': {
-                'type': 'string',
-            },
-            'thread_ids': {
-                'type': 'string',
-            },
-            'updated': {
-                'type': 'date',
-            },
             'uri': {
-                'type': 'string',
-            },
-            'uri.parts': {
                 'type': 'string',
             },
             'url': {
@@ -388,9 +364,23 @@ class SearchParamsSchema(JSONSchema):
             'user': {
                 'type': 'string',
             },
-            'user_raw': {
-                'type': 'string',
-            },
         },
         'required': [],
     }
+
+    def validate(self, data):
+        """
+        Validate `data` according to the current schema
+        and do not return any unknown properties.
+
+        :param data: The data to be validated
+        :returns: valid data
+        :raises ~h.schemas.ValidationError: if the data is invalid
+        """
+        appstruct = super(SearchParamsSchema, self).validate(data)
+        unkown_keys = set(data.keys()) - set(self.schema['properties'].keys())
+        for key in unkown_keys:
+            # del must be used here as there may be multiple
+            # of the same key and pop only removes one.
+            del appstruct[key]
+        return appstruct
