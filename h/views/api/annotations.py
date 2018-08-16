@@ -19,7 +19,7 @@ objects and Pyramid ACLs in :mod:`h.traversal`.
 from __future__ import unicode_literals
 from pyramid import i18n
 from pyramid import security
-from webob import MultiDict
+from webob.multidict import MultiDict
 
 from h import search as search_lib
 from h import storage
@@ -28,6 +28,7 @@ from h.events import AnnotationEvent
 from h.interfaces import IGroupService
 from h.presenters import AnnotationJSONLDPresenter
 from h.traversal import AnnotationContext
+from h.schemas.base import remove_unknown_properties
 from h.schemas.annotation import (
     CreateAnnotationSchema,
     SearchParamsSchema,
@@ -104,6 +105,7 @@ def search(request):
     # request.params is a NestedMultiDict which is read only, if we
     # cast it as a MultiDict then it becomes mutable.
     params = schema.validate(MultiDict(request.params))
+    remove_unknown_properties(params, schema.schema)
 
     separate_replies = params.pop('_separate_replies', False)
     stats = getattr(request, 'stats', None)

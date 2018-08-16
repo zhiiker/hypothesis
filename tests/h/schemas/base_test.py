@@ -6,12 +6,13 @@ from h._compat import PY2
 import enum
 from mock import Mock
 import pytest
+from webob.multidict import MultiDict
 
 import colander
 from pyramid.exceptions import BadCSRFToken
 
 from h.schemas import ValidationError
-from h.schemas.base import enum_type, CSRFSchema, JSONSchema
+from h.schemas.base import enum_type, CSRFSchema, JSONSchema, remove_unknown_properties
 
 
 class ExampleCSRFSchema(CSRFSchema):
@@ -32,6 +33,34 @@ class ExampleJSONSchema(JSONSchema):
         },
         'required': [prop_name_type('foo'), prop_name_type('bar')],
     }
+
+
+def get_example_json_remove_unknown_schema():
+    # Use `bytes` for property names in Py 2 so that exception messages about
+    # missing properties have the same content in Py 2 + Py 3.
+    prop_name_type = bytes if PY2 else str
+
+    schema = {
+        '$schema': 'http://json-schema.org/draft-04/schema#',
+        'type': 'object',
+        'properties': {
+            prop_name_type('foo'): {'type': 'string'},
+            prop_name_type('bar'): {'type': 'integer'},
+            prop_name_type('baz'): {
+                'properties': {
+                    prop_name_type('foo'): {'type': 'string'},
+                    prop_name_type('bar'): {
+                        'properties': {
+                            prop_name_type('foo'): {'type': 'string'},
+                            prop_name_type('bar'): {'type': 'integer'},
+                        },
+                    },
+                },
+            },
+        },
+        'required': [prop_name_type('foo'), prop_name_type('bar')],
+    }
+    return schema
 
 
 class TestCSRFSchema(object):
@@ -85,6 +114,92 @@ class TestJSONSchema(object):
 
         message = str(e.value)
         assert message.startswith("'foo' is a required property, 'bar' is a required property")
+
+
+class TestRemoveUnknownProperties(object):
+
+    @pytest.mark.parametrize('data,expected', [
+        (
+            # data
+            {"foo": "string",
+             "baz": {
+                "foo": "string",
+                "bar": {
+                    "foo": "string"
+                }
+             }},
+            # expected
+            {"foo": "string",
+             "baz": {
+                "foo": "string",
+                "bar": {
+                    "foo": "string"
+                }
+             }},
+
+        ),
+        (
+            # data
+            {"foo": "string",
+             "no_exist": "string",
+             "baz": {
+                "foo": "string",
+                "no_exist": "string",
+                "bar": {
+                    "foo": "string",
+                    "no_exist": "string",
+                }
+             }},
+            # expected
+            {"foo": "string",
+             "baz": {
+                "foo": "string",
+                "bar": {
+                    "foo": "string",
+                }
+             }},
+
+        ),
+        (
+            # data
+            {"foo": "string",
+             "no_exist": {
+                "bar": "string",
+             }},
+            # expected
+            {"foo": "string"},
+
+        ),
+        (
+            # data
+            {"foo": "string",
+             "bar": {
+                "no_exist": "string",
+             }},
+            # expected
+            {"foo": "string",
+             "bar": {
+                "no_exist": "string",
+             }},
+        ),
+        (
+            # data
+            MultiDict([("foo", "string"),
+                       ("foo", "str"),
+                       ("baz", {"foo": "string"}),
+                       ("no_exist", {"bar": "string"}),
+                       ("no_exist", "string")]),
+            # expected
+            MultiDict([("foo", "string"),
+                       ("foo", "str"),
+                       ("baz", {"foo": "string"})]),
+
+    )])
+    def test_it_removes_unknown_properties_from_data(self, data, expected):
+        schema = get_example_json_remove_unknown_schema()
+        remove_unknown_properties(data, schema)
+
+        assert data == expected
 
 
 class Color(enum.Enum):

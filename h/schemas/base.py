@@ -73,6 +73,41 @@ class JSONSchema(object):
         return appstruct
 
 
+def remove_unknown_properties(data, schema):
+    """
+    Remove unknown properties from the data.
+
+    Remove all "properties" in the data that aren't in the schema.
+    It does not perform any validation of property values; meaning if
+    a property's value is the incorrect type, it is left as-is in the
+    data.
+
+    :param data: The data to be validated
+    :param schema: The jsonschema schema to validate against
+    """
+
+    def remove_props(data, properties):
+        for prop in properties:
+            del data[prop]
+
+    data_properties = [(data, schema["properties"])]
+    # While there are still properties to be checked.
+    while data_properties:
+        data_d, schema_d = data_properties.pop()
+
+        extra_props = set(data_d.keys()) - set(schema_d.keys())
+        remove_props(data_d, extra_props)
+
+        for prop, value in data_d.items():
+            # Value must be a dict-like object.
+            if isinstance(value, dict):
+                # If a prop exists and doesn't have nested props in the
+                # schema but it does have nested props in the data, it has
+                # an invalid value so just ignore it.
+                if "properties" in schema_d[prop]:
+                    data_properties.append((value, schema_d[prop]["properties"]))
+
+
 def enum_type(enum_cls):
     """
     Return a `colander.Type` implementation for a field with a given enum type.

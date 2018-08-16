@@ -15,6 +15,9 @@ class TestBuilder(object):
         ("updated", "asc", [2, 0, 1]),
         ("created", "desc", [2, 0, 1]),
         ("created", "asc", [1, 0, 2]),
+        ("user", "asc", [0, 2, 1]),
+        ("id", "asc", [2, 0, 1]),
+        ("group", "asc", [1, 2, 0]),
 
         # Default sort order should be descending.
         ("updated", None, [1, 0, 2]),
@@ -27,9 +30,21 @@ class TestBuilder(object):
 
         # nb. Test annotations have a different ordering for updated vs created
         # and creation order is different than updated/created asc/desc.
-        ann_ids = [Annotation(updated=dt(2017, 1, 1), created=dt(2017, 1, 1)).id,
-                   Annotation(updated=dt(2018, 1, 1), created=dt(2016, 1, 1)).id,
-                   Annotation(updated=dt(2016, 1, 1), created=dt(2018, 1, 1)).id]
+        ann_ids = [Annotation(updated=dt(2017, 1, 1),
+                              userid="acct:bar@auth1",
+                              id="12345",
+                              groupid="foo",
+                              created=dt(2017, 1, 1)).id,
+                   Annotation(updated=dt(2018, 1, 1),
+                              userid="acct:foo@auth2",
+                              id="12347",
+                              groupid="bar",
+                              created=dt(2016, 1, 1)).id,
+                   Annotation(updated=dt(2016, 1, 1),
+                              userid="acct:foo@auth1",
+                              id="12344",
+                              groupid="baz",
+                              created=dt(2018, 1, 1)).id]
 
         params = {}
         if sort_key:
@@ -43,6 +58,17 @@ class TestBuilder(object):
 
     def test_it_ignores_unknown_sort_fields(self, search):
         search.run({"sort": "no_such_field"})
+
+    def test_it_finds_reply_using_the_catch_all_match_filter(self, Annotation, search):
+        ann = Annotation().id
+        reply1 = Annotation(references=[ann]).id
+        reply2 = Annotation(references=[ann, reply1]).id
+
+        params = webob.multidict.MultiDict([("references", ann),
+                                            ("references", reply1)])
+        result = search.run(params)
+
+        assert result.annotation_ids == [reply2]
 
 
 class TestTopLevelAnnotationsFilter(object):
