@@ -5,7 +5,7 @@ from copy import deepcopy
 import mock
 import pytest
 import re
-from webob.multidict import MultiDict
+from webob.multidict import NestedMultiDict, MultiDict
 
 from h.schemas import ValidationError
 from h.schemas.annotation import (
@@ -635,6 +635,7 @@ class TestSearchParamsSchema(object):
         }
 
         params = schema.validate(input_params)
+        params = schema.remove_unknown_properties(params)
 
         assert params == input_params
 
@@ -663,6 +664,7 @@ class TestSearchParamsSchema(object):
         input_params.update(unknown_params)
 
         params = schema.validate(input_params)
+        params = schema.remove_unknown_properties(params)
 
         assert params == expected_params
 
@@ -675,6 +677,7 @@ class TestSearchParamsSchema(object):
         input_params.add("unknownparam", "bar")
 
         params = schema.validate(input_params)
+        params = schema.remove_unknown_properties(params)
 
         assert params == expected_params
 

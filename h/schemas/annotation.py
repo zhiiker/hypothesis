@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 
 import copy
 from pyramid import i18n
+from webob.request import MultiDict
 
 from h.schemas.base import JSONSchema, ValidationError
 from h.util import document_claims
@@ -378,6 +379,9 @@ class SearchParamsSchema(JSONSchema):
         :raises ~h.schemas.ValidationError: if the data is invalid
         """
         appstruct = super(SearchParamsSchema, self).validate(data)
+        # Cast as a MultiDict since it returns the same type that
+        # is passed in and in some cases that may be a read only NestedMultiDict.
+        appstruct = MultiDict(appstruct)
         unkown_keys = set(data.keys()) - set(self.schema['properties'].keys())
         for key in unkown_keys:
             # del must be used here as there may be multiple

@@ -19,6 +19,7 @@ objects and Pyramid ACLs in :mod:`h.traversal`.
 from __future__ import unicode_literals
 from pyramid import i18n
 from pyramid import security
+from webob import MultiDict
 
 from h import search as search_lib
 from h import storage
@@ -100,7 +101,9 @@ def search(request):
     """Search the database for annotations matching with the given query."""
     schema = SearchParamsSchema()
 
-    params = schema.validate(request.params)
+    # request.params is a NestedMultiDict which is read only, if we
+    # cast it as a MultiDict then it becomes mutable.
+    params = schema.validate(MultiDict(request.params))
 
     separate_replies = params.pop('_separate_replies', False)
     stats = getattr(request, 'stats', None)
