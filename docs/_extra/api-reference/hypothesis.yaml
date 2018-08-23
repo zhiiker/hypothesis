@@ -305,6 +305,7 @@ paths:
           description: The field by which annotations should be sorted.
           required: false
           type: string
+          enum: [created, updated, group, id, tags_raw, raw_user, uri]
           default: updated
         - name: order
           in: query
@@ -342,10 +343,35 @@ paths:
           description: Limit the results to annotations tagged with the specified value.
           required: false
           type: string
+        - name: tags
+          in: query
+          description: Alias of `tag`.
+          required: false
+          type: string
         - name: any
           in: query
-          description: |
-            Limit the results to annotations in which one of a number of common fields contain the passed value.
+          description: Limit the results to annotations whose quote, tags, text or url fields contain this key word.  
+          required: false
+          type: string
+        - name: group
+          in: query
+          description: Limit the results to this group of annotations.
+          required: false
+          type: string
+        - name: quote
+          in: query
+          description: Limit the results to annotations that contain this text inside
+            the text that was annotated.
+          required: false
+          type: string
+        - name: references
+          in: query
+          description: Returns annotations that are replies to this parent annotation id.
+          required: false
+          type: string
+        - name: text
+          in: query
+          description: Limit the results to annotations that contain this text in their textual body.
           required: false
           type: string
       responses:

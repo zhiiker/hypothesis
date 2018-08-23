@@ -314,55 +314,77 @@ def _target_selectors(targets):
 
 
 class SearchParamsSchema(JSONSchema):
-    """Validates a JSON payload for an elasticsearch query via API"""
+    """Validates search query parameters that are passed to an /api/search request."""
     schema = {
         # 'type': 'object',
         'properties': {
             '_separate_replies': {
                 'type': 'string',
+                'description': "Return a seperate set of annotations and their replies.",
             },
             'sort': {
                 'type': 'string',
+                'enum': ["created", "updated", "group", "id", "user"],
+                'description': "The field by which annotations should be sorted.",
             },
             'limit': {
                 'type': 'string',
+                'description': "The maximum number of annotations to return.",
             },
             'order': {
                 'type': 'string',
                 'enum': ["asc", "desc"],
+                'description': "The direction of sort.",
             },
             'offset': {
                 'type': 'string',
+                'description': """The minimum number of initial annotations to skip. This is
+                               used for pagination.""",
             },
             'group': {
                 'type': 'string',
+                'description': "Limit the results to this group of annotations.",
             },
             'quote': {
                 'type': 'string',
+                'description': """Limit the results to annotations that contain this text inside
+                                the text that was annotated.""",
             },
             'references': {
                 'type': 'string',
+                'description': """Returns annotations that are replies to this parent annotation id.""",
             },
             'tag': {
                 'type': 'string',
+                'description': "Limit the results to annotations tagged with the specified value.",
             },
             'tags': {
                 'type': 'string',
+                'description': "Alias of tag.",
             },
             'text': {
                 'type': 'string',
-            },
+                'description': "Limit the results to annotations that contain this text in their textual body.",
+             },
             'uri': {
                 'type': 'string',
+                'description': """Limit the results to annotations matching the specific URI
+                               or equivalent URIs. URI can be a URL (a web page address) or
+                               a URN representing another kind of resource such as DOI
+                               (Digital Object Identifier) or a PDF fingerprint.""",
             },
             'url': {
                 'type': 'string',
+                'description': "Alias of uri.",
             },
             'any': {
                 'type': 'string',
+                'description': """Limit the results to annotations whose quote, tags,
+                               text or url fields contain this key word.""",
             },
             'user': {
                 'type': 'string',
+                'description': "Limit the results to annotations made by the specified user.",
             },
         },
         'required': [],
