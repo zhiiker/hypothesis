@@ -3,6 +3,7 @@
 from __future__ import unicode_literals
 
 import copy
+import colander
 from pyramid import i18n
 
 from h.schemas.base import JSONSchema, ValidationError
@@ -311,6 +312,47 @@ def _target_selectors(targets):
         return targets[0]['selector']
     else:
         return []
+
+
+def _optional_string_list():
+    return colander.SchemaNode(colander.Sequence(), colander.SchemaNode(colander.String()),
+                               missing=colander.drop)
+
+
+class SearchAnnotationsSchema(colander.Schema):
+    """
+    Schema for `GET /api/search` query parameters.
+    """
+
+    # Fields that affect search result number and ordering.
+    sort = colander.SchemaNode(colander.String(),
+                               validator=colander.OneOf(["updated", "created", "id", "group", "user"]),
+                               missing=colander.drop)
+
+    order = colander.SchemaNode(colander.String(),
+                                validator=colander.OneOf(["asc", "desc"]),
+                                missing=colander.drop)
+
+    limit = colander.SchemaNode(colander.Integer(),
+                                validator=colander.Range(0, 200),
+                                missing=colander.drop)
+
+    offset = colander.SchemaNode(colander.Integer(),
+                                 validator=colander.Range(0, 2000),
+                                 missing=colander.drop)
+
+    # Undocumented options
+    _separate_replies = colander.SchemaNode(colander.Boolean(), missing=colander.drop)
+
+    # Specific fields that can be searched by.
+    any = _optional_string_list()
+    quote = _optional_string_list()
+    references = _optional_string_list()
+    tag = _optional_string_list()
+    tags = _optional_string_list()
+    uri = _optional_string_list()
+    url = _optional_string_list()
+    user = _optional_string_list()
 
 
 class SearchParamsSchema(JSONSchema):
