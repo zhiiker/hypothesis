@@ -2,6 +2,8 @@
 
 from __future__ import unicode_literals
 
+import colander
+
 from h.schemas.base import JSONSchema
 from h.models.group import (
     GROUP_NAME_MIN_LENGTH,
@@ -29,3 +31,14 @@ class CreateGroupAPISchema(JSONSchema):
             'name'
         ],
     }
+
+
+class GetGroupsAPISchema(colander.Schema):
+    """Query parameter schema for `GET /api/groups`."""
+
+    authority = colander.SchemaNode(colander.String(), missing=None)
+    document_uri = colander.SchemaNode(colander.String(), validator=colander.url, missing=None)
+    expand = colander.SchemaNode(colander.Sequence(),
+                                 colander.SchemaNode(colander.String(),
+                                                     validator=colander.OneOf(["organization"])),
+                                 missing=[])
