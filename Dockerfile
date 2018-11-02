@@ -72,6 +72,4 @@ COPY . .
 # If we're building from a git clone, ensure that .git is writeable
 RUN [ -d .git ] && chown -R hypothesis:hypothesis .git || :
 
-RUN  pip install -r tox-requirements.txt
-
 USER hypothesis
