@@ -47,12 +47,6 @@ ENV PYTHONPATH /var/lib/hypothesis:$PYTHONPATH
 
 WORKDIR /var/lib/hypothesis
 
-# Copy nginx config
-COPY conf/nginx.conf /etc/nginx/nginx.conf
-
-# Copy collectd config
-COPY conf/collectd.conf /etc/collectd/collectd.conf
-
 # Copy minimal data to allow installation of dependencies.
 COPY requirements.txt package.json gulpfile.js ./
 
@@ -63,6 +57,12 @@ COPY  h/static/ ./h/static/
 # Install node and python packages and cleanup build deps.
 RUN npm ci --production && npm run build \
   && pip install --no-cache-dir -r requirements.txt  
+
+# Copy collectd config
+COPY conf/collectd.conf /etc/collectd/collectd.conf
+
+# Copy nginx config
+COPY conf/nginx.conf /etc/nginx/nginx.conf
 
 # Copy the rest of the application files.
 COPY . .
