@@ -171,7 +171,7 @@ class UpdateAnnotationSchema(object):
         _remove_protected_fields(appstruct)
 
         # Some fields are not allowed to be changed in annotation updates.
-        for key in ["group", "groupid", "userid", "references"]:
+        for key in ["groupid", "userid", "references"]:
             appstruct.pop(key, "")
 
         # Fields that are allowed to be updated and that have a different name
@@ -184,13 +184,16 @@ class UpdateAnnotationSchema(object):
 
         if "permissions" in appstruct:
             new_appstruct["shared"] = _shared(
-                appstruct.pop("permissions"), self.groupid
+                appstruct.pop("permissions"), appstruct.get('group', self.groupid)
             )
 
         if "target" in appstruct:
             new_appstruct["target_selectors"] = _target_selectors(
                 appstruct.pop("target")
             )
+
+        # Store the client's 'group' key as the groupid in the model.
+        new_appstruct['groupid'] = appstruct['group']
 
         # Fields that are allowed to be updated and that have the same internal
         # and external name.
