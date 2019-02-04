@@ -157,7 +157,7 @@ class UpdateAnnotationSchema(object):
 
     """Validate the POSTed data of an update annotation request."""
 
-    def __init__(self, request, existing_target_uri, groupid):
+    def __init__(self, request, existing_target_uri, groupid, replies):
         self.request = request
         self.existing_target_uri = existing_target_uri
         self.groupid = groupid
@@ -192,8 +192,10 @@ class UpdateAnnotationSchema(object):
                 appstruct.pop("target")
             )
 
-        # Store the client's 'group' key as the groupid in the model.
-        new_appstruct['groupid'] = appstruct['group']
+        # If the annotation has replies, the group cannot be changed.
+        if appstruct['group'] != self.groupid and not replies:
+            # Store the client's 'group' key as the groupid in the model.
+            new_appstruct['groupid'] = appstruct['group']
 
         # Fields that are allowed to be updated and that have the same internal
         # and external name.

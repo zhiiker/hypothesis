@@ -126,6 +126,7 @@ class Annotation(Base):
 
     document = sa.orm.relationship("Document", backref="annotations")
 
+    # "thread" is a list of the annotation's replies.
     thread = sa.orm.relationship(
         "Annotation",
         primaryjoin=(sa.orm.foreign(id) == sa.orm.remote(references[0])),

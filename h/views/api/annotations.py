@@ -120,7 +120,8 @@ def update(context, request):
         request.stats.incr("api.deprecated.put_update_annotation")
 
     schema = UpdateAnnotationSchema(
-        request, context.annotation.target_uri, context.annotation.groupid
+        request, context.annotation.target_uri, context.annotation.groupid,
+        context.annotation.thread,
     )
     appstruct = schema.validate(_json_payload(request))
     group_service = request.find_service(IGroupService)
