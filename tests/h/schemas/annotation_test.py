@@ -27,9 +27,9 @@ def create_annotation_schema_validate(request, data):
 
 
 def update_annotation_schema_validate(
-    request, data, existing_target_uri="", groupid=""
+    request, data, existing_target_uri="", groupid="", replies=[]
 ):
-    schema = UpdateAnnotationSchema(request, existing_target_uri, groupid)
+    schema = UpdateAnnotationSchema(request, existing_target_uri, groupid, replies)
     return schema.validate(data)
 
 
@@ -491,8 +491,24 @@ class TestCreateAnnotationSchema(object):
 
 
 class TestUpdateAnnotationSchema(object):
-    def test_you_cannot_change_an_annotations_group(self, pyramid_request):
-        schema = UpdateAnnotationSchema(pyramid_request, "", "")
+    def test_you_can_change_an_annotations_group_by_group(self, pyramid_request):
+        schema = UpdateAnnotationSchema(pyramid_request, "", "", [])
+
+        appstruct = schema.validate({"group": "new-group"})
+
+        assert appstruct["group"] == "new-group"
+        assert "group" not in appstruct.get("extra", {})
+
+    def test_you_can_change_an_annotations_group_by_groupid(self, pyramid_request):
+        schema = UpdateAnnotationSchema(pyramid_request, "", "", [])
+
+        appstruct = schema.validate({"groupid": "new-group"})
+
+        assert appstruct["groupid"] == "new-group"
+        assert "groupid" not in appstruct.get("extra", {})
+
+    def test_you_cannot_change_an_annotations_group_if_it_has_replies(self, pyramid_request):
+        schema = UpdateAnnotationSchema(pyramid_request, "", "", ["replyid"])
 
         appstruct = schema.validate({"groupid": "new-group", "group": "new-group"})
 
@@ -501,8 +517,18 @@ class TestUpdateAnnotationSchema(object):
         assert "group" not in appstruct
         assert "group" not in appstruct.get("extra", {})
 
+    def test_annotations_group_cannot_be_changed_if_no_permission_to_group(self, pyramid_request):
+        schema = UpdateAnnotationSchema(pyramid_request, "", "", [])
+
+        appstruct = schema.validate({"group": "new-group"})
+
+        assert "groupid" not in appstruct
+        assert "groupid" not in appstruct.get("extra", {})
+        assert "group" not in appstruct
+        assert "group" not in appstruct.get("extra", {})
+
     def test_you_cannot_change_an_annotations_userid(self, pyramid_request):
-        schema = UpdateAnnotationSchema(pyramid_request, "", "")
+        schema = UpdateAnnotationSchema(pyramid_request, "", "", [])
 
         appstruct = schema.validate({"userid": "new_userid"})
 
@@ -510,7 +536,7 @@ class TestUpdateAnnotationSchema(object):
         assert "userid" not in appstruct.get("extra", {})
 
     def test_you_cannot_change_an_annotations_references(self, pyramid_request):
-        schema = UpdateAnnotationSchema(pyramid_request, "", "")
+        schema = UpdateAnnotationSchema(pyramid_request, "", "", [])
 
         appstruct = schema.validate({"references": ["new_parent"]})
 
@@ -518,7 +544,7 @@ class TestUpdateAnnotationSchema(object):
         assert "references" not in appstruct.get("extra", {})
 
     def test_it_replaces_private_permissions_with_shared_False(self, pyramid_request):
-        schema = UpdateAnnotationSchema(pyramid_request, "", "")
+        schema = UpdateAnnotationSchema(pyramid_request, "", "", [])
 
         appstruct = schema.validate(
             {"permissions": {"read": ["acct:harriet@example.com"]}}
@@ -529,7 +555,7 @@ class TestUpdateAnnotationSchema(object):
         assert "permissions" not in appstruct.get("extras", {})
 
     def test_it_replaces_shared_permissions_with_shared_True(self, pyramid_request):
-        schema = UpdateAnnotationSchema(pyramid_request, "", "__world__")
+        schema = UpdateAnnotationSchema(pyramid_request, "", "__world__", [])
 
         appstruct = schema.validate({"permissions": {"read": ["group:__world__"]}})
 
@@ -549,7 +575,7 @@ class TestUpdateAnnotationSchema(object):
 
         """
         document_data = {"foo": "bar"}
-        schema = UpdateAnnotationSchema(pyramid_request, mock.sentinel.target_uri, "")
+        schema = UpdateAnnotationSchema(pyramid_request, mock.sentinel.target_uri, "", [])
 
         schema.validate({"document": document_data})
 
@@ -569,7 +595,7 @@ class TestUpdateAnnotationSchema(object):
 
         """
         document_data = {"foo": "bar"}
-        schema = UpdateAnnotationSchema(pyramid_request, mock.sentinel.target_uri, "")
+        schema = UpdateAnnotationSchema(pyramid_request, mock.sentinel.target_uri, "", [])
 
         schema.validate({"document": document_data})
 
