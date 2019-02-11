@@ -182,6 +182,15 @@ class UpdateAnnotationSchema(object):
                 raise ValidationError("uri: " + _("'uri' is a required property"))
             new_appstruct["target_uri"] = new_uri
 
+        new_group = appstruct.get('group', self.groupid)
+        if new_group != self.groupid:
+            # Verify group exists.
+            group = self.request.db.query(Group).filter_by(id=new_group).one_or_none()
+            if group is None:
+                new_group = self.groupid
+            # Check permissions.
+
+
         if "permissions" in appstruct:
             new_appstruct["shared"] = _shared(
                 appstruct.pop("permissions"), appstruct.get('group', self.groupid)
