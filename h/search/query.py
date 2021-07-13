@@ -17,7 +17,7 @@ DEFAULT_DATE = dt(1970, 1, 1, 0, 0, 0, 0).replace(tzinfo=tz.tzutc())
 
 
 def popall(multidict, key):
-    """ Pops and returns all values of the key in multidict"""
+    """Pops and returns all values of the key in multidict"""
     values = multidict.getall(key)
     if values:
         del multidict[key]
@@ -196,27 +196,23 @@ class AuthFilter:
 class GroupFilter:
 
     """
-    Matches only those annotations belonging to the specified group.
+    Filter that limits which groups annotations are returned from.
+
+    This excludes annotations from groups that the user is not authorized to
+    read or which are explicitly excluded by the search query.
     """
-
-    def __call__(self, search, params):
-        # Remove parameter if passed, preventing fall-through to default query
-        group = params.pop("group", None)
-
-        if group is not None:
-            return search.filter("term", group=group)
-        return search
-
-
-class GroupAuthFilter:
-    """Filter out groups that the request isn't authorized to read."""
 
     def __init__(self, request):
         self.user = request.user
         self.group_service = request.find_service(name="group")
 
-    def __call__(self, search, _):
-        groups = self.group_service.groupids_readable_by(self.user)
+    def __call__(self, search, params):
+        group_ids = None
+        if "group" in params:
+            # Remove parameter if passed, preventing it being passed to default query
+            group_ids = [params.pop("group")]
+        groups = self.group_service.groupids_readable_by(self.user, group_ids)
+
         return search.filter("terms", group=groups)
 
 
@@ -361,13 +357,9 @@ class HiddenFilter:
         ]
 
         if self.user is not None:
-            # Always show the logged-in user's annotations even if they have nipsa.
+            # Always show the logged-in user's annotations even if they have
+            # been hidden or the user has been NIPSA'd
             should_clauses.append(Q("term", user=self.user.userid.lower()))
-
-            # Also include nipsa'd annotations for groups that the user created.
-            created_groups = self.group_service.groupids_created_by(self.user)
-            if created_groups:
-                should_clauses.append(Q("terms", group=created_groups))
 
         return search.filter(Q("bool", should=should_clauses))
 

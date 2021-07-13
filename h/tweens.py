@@ -1,8 +1,7 @@
-import collections
 import logging
-from codecs import open
+from collections.abc import Sequence
 
-from pkg_resources import resource_filename
+import importlib_resources
 from pyramid import httpexceptions
 from pyramid.util import DottedNameResolver
 
@@ -35,8 +34,7 @@ def conditional_http_tween_factory(handler, registry):
         # status code of 200. The subtleties of doing it correctly in other
         # cases don't bear thinking about (at the moment).
         have_buffered_response = (
-            isinstance(response.app_iter, collections.Sequence)
-            and len(response.app_iter) == 1
+            isinstance(response.app_iter, Sequence) and len(response.app_iter) == 1
         )
         cacheable = request.method in {"GET", "HEAD"} and response.status_code == 200
         if have_buffered_response and cacheable:
@@ -75,8 +73,9 @@ def redirect_tween_factory(handler, registry, redirects=None):
         # N.B. If we fail to load or parse the redirects file, the application
         # will fail to boot. This is deliberate: a missing/corrupt redirects
         # file should result in a healthcheck failure.
-        with open(resource_filename("h", "redirects"), encoding="utf-8") as fp:
-            redirects = parse_redirects(fp)
+
+        with importlib_resources.open_text("h", "redirects") as handle:
+            redirects = parse_redirects(handle)
 
     def redirect_tween(request):
         url = lookup_redirects(redirects, request)

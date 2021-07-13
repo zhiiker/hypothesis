@@ -8,16 +8,8 @@ from pyramid.httpexceptions import (
     HTTPNotFound,
 )
 
-from h import traversal
-from h.services.group import GroupService
-from h.services.group_create import GroupCreateService
-from h.services.group_links import GroupLinksService
-from h.services.group_list import GroupListService
-from h.services.group_members import GroupMembersService
-from h.services.group_update import GroupUpdateService
+from h.traversal.group import GroupContext
 from h.views.api import groups as views
-
-pytestmark = pytest.mark.usefixtures("GroupsJSONPresenter")
 
 
 @pytest.mark.usefixtures("group_list_service", "group_links_service")
@@ -40,79 +32,41 @@ class TestGetGroups:
             document_uri="http://example.com/thisthing.html",
         )
 
-    def test_converts_groups_to_resources(
-        self, GroupContext, anonymous_request, open_groups, group_list_service
-    ):
-        group_list_service.request_groups.return_value = open_groups
-
-        views.groups(anonymous_request)
-
-        GroupContext.assert_has_calls(
-            [
-                mock.call(open_groups[0], anonymous_request),
-                mock.call(open_groups[1], anonymous_request),
-            ]
-        )
-
-    def test_uses_presenter_for_formatting(
+    @pytest.mark.parametrize(
+        "expand",
+        ([], ["organization"], ["organization", "scopes"]),
+    )
+    def test_returns_dicts_from_presenter(
         self,
-        group_links_service,
+        anonymous_request,
         open_groups,
         group_list_service,
         GroupsJSONPresenter,
-        anonymous_request,
+        expand,
     ):
-        group_list_service.request_groups.return_value = open_groups
+        for param in expand:
+            anonymous_request.GET.add("expand", param)
 
-        views.groups(anonymous_request)
-
-        GroupsJSONPresenter.assert_called_once()
-
-    def test_returns_dicts_from_presenter(
-        self, anonymous_request, open_groups, group_list_service, GroupsJSONPresenter
-    ):
         group_list_service.request_groups.return_value = open_groups
 
         result = views.groups(anonymous_request)
 
-        assert result == GroupsJSONPresenter(open_groups).asdicts.return_value
-
-    def test_proxies_expand_to_presenter(
-        self, anonymous_request, open_groups, group_list_service, GroupsJSONPresenter
-    ):
-        anonymous_request.params["expand"] = "organization"
-        group_list_service.request_groups.return_value = open_groups
-
-        views.groups(anonymous_request)
-
-        GroupsJSONPresenter(open_groups).asdicts.assert_called_once_with(
-            expand=["organization"]
-        )
-
-    def test_passes_multiple_expand_to_presenter(
-        self, anonymous_request, open_groups, group_list_service, GroupsJSONPresenter
-    ):
-        anonymous_request.GET.add("expand", "organization")
-        anonymous_request.GET.add("expand", "foobars")
-        group_list_service.request_groups.return_value = open_groups
-
-        views.groups(anonymous_request)
-
-        GroupsJSONPresenter(open_groups).asdicts.assert_called_once_with(
-            expand=["organization", "foobars"]
-        )
+        GroupsJSONPresenter.assert_called_once_with(open_groups, anonymous_request)
+        GroupsJSONPresenter.return_value.asdicts.assert_called_once_with(expand=expand)
+        assert result == GroupsJSONPresenter.return_value.asdicts.return_value
 
     @pytest.fixture
     def open_groups(self, factories):
         return [factories.OpenGroup(), factories.OpenGroup()]
 
+    @pytest.fixture
+    def anonymous_request(self, pyramid_request):
+        pyramid_request.user = None
+        return pyramid_request
+
 
 @pytest.mark.usefixtures(
-    "CreateGroupAPISchema",
-    "group_service",
-    "group_create_service",
-    "GroupContext",
-    "GroupJSONPresenter",
+    "CreateGroupAPISchema", "group_service", "group_create_service"
 )
 class TestCreateGroup:
     def test_it_inits_group_create_schema(self, pyramid_request, CreateGroupAPISchema):
@@ -182,34 +136,27 @@ class TestCreateGroup:
     def test_it_raises_HTTPConflict_on_duplicate(
         self, pyramid_request, CreateGroupAPISchema, group_service, factories
     ):
-
-        group = factories.Group(
-            authority_provided_id="something", authority="example.com"
+        # Return a different pre-existing group when we search by id
+        group_service.fetch.return_value = factories.Group(
+            authority_provided_id="different_id", authority="example.com"
         )
-        group_service.fetch.return_value = group
 
         with pytest.raises(HTTPConflict, match="group with groupid.*already exists"):
             views.create(pyramid_request)
 
     def test_it_creates_group_context_from_created_group(
-        self, pyramid_request, GroupContext, group_create_service
+        self, pyramid_request, factories, group_create_service, GroupJSONPresenter
     ):
-        my_group = mock.Mock()
-        group_create_service.create_private_group.return_value = my_group
+        group = factories.Group()
+        group_create_service.create_private_group.return_value = group
 
-        views.create(pyramid_request)
+        result = views.create(pyramid_request)
 
-        GroupContext.assert_called_with(my_group, pyramid_request)
-
-    def test_it_returns_new_group_formatted_with_presenter(
-        self, pyramid_request, GroupContext, GroupJSONPresenter
-    ):
-        views.create(pyramid_request)
-
-        GroupJSONPresenter.assert_called_once_with(GroupContext.return_value)
+        GroupJSONPresenter.assert_called_once_with(group, pyramid_request)
         GroupJSONPresenter.return_value.asdict.assert_called_once_with(
             expand=["organization", "scopes"]
         )
+        assert result == GroupJSONPresenter.return_value.asdict.return_value
 
     @pytest.fixture
     def pyramid_request(self, pyramid_request, factories):
@@ -220,106 +167,68 @@ class TestCreateGroup:
         return pyramid_request
 
 
-@pytest.mark.usefixtures("GroupJSONPresenter", "GroupContext")
 class TestReadGroup:
-    def test_it_creates_group_context_from_group_model(
-        self, GroupContext, factories, pyramid_request
-    ):
-        group = factories.Group()
-
-        views.read(group, pyramid_request)
-
-        GroupContext.assert_called_once_with(group, pyramid_request)
-
-    def test_it_forwards_expand_param_to_presenter(
-        self, GroupJSONPresenter, factories, pyramid_request
-    ):
+    def test_it(self, context, pyramid_request, GroupJSONPresenter):
         pyramid_request.params["expand"] = "organization"
-        group = factories.Group()
 
-        views.read(group, pyramid_request)
+        result = views.read(context, pyramid_request)
 
+        GroupJSONPresenter.assert_called_once_with(context.group, pyramid_request)
         GroupJSONPresenter.return_value.asdict.assert_called_once_with(["organization"])
-
-    def test_it_returns_presented_group(
-        self, GroupJSONPresenter, factories, pyramid_request
-    ):
-        pyramid_request.params["expand"] = "organization"
-        group = factories.Group()
-
-        presented = views.read(group, pyramid_request)
-
-        assert presented == GroupJSONPresenter.return_value.asdict.return_value
+        assert result == GroupJSONPresenter.return_value.asdict.return_value
 
 
-@pytest.mark.usefixtures(
-    "UpdateGroupAPISchema",
-    "group_service",
-    "group_update_service",
-    "GroupContext",
-    "GroupJSONPresenter",
-)
+@pytest.mark.usefixtures("group_service", "group_update_service")
 class TestUpdateGroup:
     def test_it_inits_group_update_schema(
-        self, pyramid_request, group, UpdateGroupAPISchema
+        self, pyramid_request, context, UpdateGroupAPISchema
     ):
-        views.update(group, pyramid_request)
+        views.update(context, pyramid_request)
 
         UpdateGroupAPISchema.return_value.validate.assert_called_once_with({})
 
     def test_it_passes_request_params_to_group_update_service(
-        self, group, pyramid_request, UpdateGroupAPISchema, group_update_service
+        self, context, pyramid_request, UpdateGroupAPISchema, group_update_service
     ):
         patch_payload = {"name": "My Group", "description": "How about that?"}
         UpdateGroupAPISchema.return_value.validate.return_value = patch_payload
-        views.update(group, pyramid_request)
 
-        group_update_service.update.assert_called_once_with(group, **patch_payload)
+        views.update(context, pyramid_request)
+
+        group_update_service.update.assert_called_once_with(
+            context.group, **patch_payload
+        )
 
     def test_it_raises_HTTPConflict_on_duplicate(
-        self, pyramid_request, UpdateGroupAPISchema, group_service, factories
+        self, pyramid_request, UpdateGroupAPISchema, context, group_service, factories
     ):
-
-        pre_existing_group = factories.Group(
-            authority_provided_id="something", authority="example.com"
+        # Return a different pre-existing group when we search by id
+        group_service.fetch.return_value = factories.Group(
+            authority_provided_id="different_id", authority=context.group.authority
         )
-        group = factories.Group(
-            authority_provided_id="something_else", authority="example.com"
-        )
-        group_service.fetch.return_value = pre_existing_group
 
         with pytest.raises(HTTPConflict, match="group with groupid.*already exists"):
-            views.update(group, pyramid_request)
+            views.update(context, pyramid_request)
 
     def test_it_does_not_raise_HTTPConflict_if_duplicate_is_same_group(
-        self, pyramid_request, UpdateGroupAPISchema, group_service, factories
+        self, pyramid_request, UpdateGroupAPISchema, context, group_service
     ):
-        group = factories.Group(
-            authority_provided_id="something_else", authority="example.com"
-        )
-        group_service.fetch.return_value = group
+        group_service.fetch.return_value = context.group
 
-        views.update(group, pyramid_request)
+        views.update(context, pyramid_request)
 
     def test_it_creates_group_context_from_updated_group(
-        self, pyramid_request, GroupContext, group_update_service
+        self, pyramid_request, context, group_update_service, GroupJSONPresenter
     ):
-        my_group = mock.Mock()
-        group_update_service.update.return_value = my_group
+        group_update_service.update.return_value = context.group
 
-        views.update(my_group, pyramid_request)
+        result = views.update(context, pyramid_request)
 
-        GroupContext.assert_called_with(my_group, pyramid_request)
-
-    def test_it_returns_updated_group_formatted_with_presenter(
-        self, pyramid_request, GroupContext, GroupJSONPresenter, group
-    ):
-        views.update(group, pyramid_request)
-
-        GroupJSONPresenter.assert_called_once_with(GroupContext.return_value)
+        GroupJSONPresenter.assert_called_with(context.group, pyramid_request)
         GroupJSONPresenter.return_value.asdict.assert_called_once_with(
             expand=["organization", "scopes"]
         )
+        assert result == GroupJSONPresenter.return_value.asdict.return_value
 
     @pytest.fixture
     def pyramid_request(self, pyramid_request, factories):
@@ -329,43 +238,35 @@ class TestUpdateGroup:
         pyramid_request.user = factories.User()
         return pyramid_request
 
-    @pytest.fixture
-    def group(self, factories):
-        return factories.Group(authority="example.com")
+    @pytest.fixture(autouse=True)
+    def UpdateGroupAPISchema(self, patch):
+        return patch("h.views.api.groups.UpdateGroupAPISchema")
 
 
 @pytest.mark.usefixtures(
-    "create",
-    "CreateGroupAPISchema",
-    "group_service",
-    "group_update_service",
-    "GroupContext",
-    "GroupJSONPresenter",
+    "CreateGroupAPISchema", "group_service", "group_update_service"
 )
 class TestUpsertGroup:
     def test_it_proxies_to_create_if_group_empty(
-        self, pyramid_request, create, GroupUpsertContext
+        self, context, pyramid_request, groups_create
     ):
-        context = GroupUpsertContext(None, pyramid_request)
+        context.group = None
 
         res = views.upsert(context, pyramid_request)
 
-        create.assert_called_once_with(pyramid_request)
-        assert res == create.return_value
+        groups_create.assert_called_once_with(pyramid_request)
+        assert res == groups_create.return_value
 
     def test_it_does_not_proxy_to_create_if_group_extant(
-        self, pyramid_request, create, group, GroupUpsertContext
+        self, context, pyramid_request, groups_create
     ):
-        context = GroupUpsertContext(group, pyramid_request)
-
         views.upsert(context, pyramid_request)
 
-        assert create.call_count == 0
+        assert groups_create.call_count == 0
 
     def test_it_validates_against_group_update_schema_if_group_extant(
-        self, pyramid_request, group, GroupUpsertContext, CreateGroupAPISchema
+        self, context, pyramid_request, CreateGroupAPISchema
     ):
-        context = GroupUpsertContext(group, pyramid_request)
         pyramid_request.json_body = {"name": "Rename Group"}
 
         views.upsert(context, pyramid_request)
@@ -375,94 +276,50 @@ class TestUpsertGroup:
         )
 
     def test_it_raises_HTTPConflict_on_duplicate(
-        self, pyramid_request, group_service, factories, GroupUpsertContext
+        self, context, pyramid_request, group_service, factories
     ):
-
-        pre_existing_group = factories.Group(
-            authority_provided_id="something", authority="example.com"
+        # Return a different pre-existing group when we search by id
+        group_service.fetch.return_value = factories.Group(
+            authority_provided_id="different_id", authority=context.group.authority
         )
-        group = factories.Group(
-            authority_provided_id="something_else", authority="example.com"
-        )
-
-        context = GroupUpsertContext(group, pyramid_request)
-
-        group_service.fetch.return_value = pre_existing_group
 
         with pytest.raises(HTTPConflict, match="group with groupid.*already exists"):
             views.upsert(context, pyramid_request)
 
     def test_it_does_not_raise_HTTPConflict_if_duplicate_is_same_group(
-        self, pyramid_request, group_service, factories, GroupUpsertContext
+        self, context, pyramid_request, group_service
     ):
-        group = factories.Group(
-            authority_provided_id="something_else", authority="example.com"
-        )
-        context = GroupUpsertContext(group, pyramid_request)
-        group_service.fetch.return_value = group
+        group_service.fetch.return_value = context.group
 
         views.upsert(context, pyramid_request)
 
     def test_it_proxies_to_update_service_with_injected_defaults(
-        self,
-        pyramid_request,
-        group_update_service,
-        CreateGroupAPISchema,
-        GroupUpsertContext,
-        group,
+        self, context, pyramid_request, group_update_service, CreateGroupAPISchema
     ):
-        context = GroupUpsertContext(group, pyramid_request)
-
         CreateGroupAPISchema.return_value.validate.return_value = {"name": "Dingdong"}
 
         views.upsert(context, pyramid_request)
 
         group_update_service.update.assert_called_once_with(
-            group, **{"name": "Dingdong", "description": "", "groupid": None}
+            context.group, **{"name": "Dingdong", "description": "", "groupid": None}
         )
 
-    def test_it_creates_group_context_from_updated_group(
-        self,
-        pyramid_request,
-        GroupContext,
-        group_update_service,
-        group,
-        GroupUpsertContext,
-    ):
-        context = GroupUpsertContext(group, pyramid_request)
-        group_update_service.update.return_value = group
-
-        views.upsert(context, pyramid_request)
-
-        GroupContext.assert_called_with(group, pyramid_request)
-
     def test_it_returns_updated_group_formatted_with_presenter(
-        self,
-        pyramid_request,
-        GroupContext,
-        GroupJSONPresenter,
-        group,
-        GroupUpsertContext,
+        self, context, pyramid_request, group_update_service, GroupJSONPresenter
     ):
-        context = GroupUpsertContext(group, pyramid_request)
-        views.upsert(context, pyramid_request)
+        group_update_service.update.return_value = context.group
 
-        GroupJSONPresenter.assert_called_once_with(GroupContext.return_value)
+        result = views.upsert(context, pyramid_request)
+
+        GroupJSONPresenter.assert_called_with(context.group, pyramid_request)
         GroupJSONPresenter.return_value.asdict.assert_called_once_with(
             expand=["organization", "scopes"]
         )
+        assert result == GroupJSONPresenter.return_value.asdict.return_value
 
     @pytest.fixture
-    def create(self, patch):
+    def groups_create(self, patch):
         return patch("h.views.api.groups.create")
-
-    @pytest.fixture
-    def group_user(self, factories):
-        return factories.User()
-
-    @pytest.fixture
-    def group(self, factories, group_user):
-        return factories.Group(creator=group_user)
 
     @pytest.fixture
     def pyramid_request(self, pyramid_request):
@@ -471,97 +328,87 @@ class TestUpsertGroup:
         pyramid_request.json_body = {}
         return pyramid_request
 
-    @pytest.fixture
-    def GroupUpsertContext(self):
-        def context_factory(group, request):
-            return mock.create_autospec(
-                traversal.GroupUpsertContext, instance=True, group=group
-            )
-
-        return context_factory
-
 
 class TestReadMembers:
     def test_it_returns_formatted_users_from_group(
-        self, factories, pyramid_request, UserJSONPresenter
+        self, context, factories, pyramid_request, UserJSONPresenter
     ):
-        group = factories.Group.build()
-        group.members = [
+        context.group.members = [
             factories.User.build(),
             factories.User.build(),
             factories.User.build(),
         ]
 
-        views.read_members(group, pyramid_request)
+        views.read_members(context, pyramid_request)
 
-        assert UserJSONPresenter.call_count == len(group.members)
+        assert UserJSONPresenter.call_count == len(context.group.members)
+
+    @pytest.fixture
+    def UserJSONPresenter(self, patch):
+        return patch("h.views.api.groups.UserJSONPresenter")
 
 
 @pytest.mark.usefixtures("group_members_service", "user_service")
 class TestAddMember:
     def test_it_adds_user_from_request_params_to_group(
-        self, group, user, pyramid_request, group_members_service
+        self, context, user, pyramid_request, group_members_service
     ):
-        views.add_member(group, pyramid_request)
+        views.add_member(context, pyramid_request)
 
-        group_members_service.member_join.assert_called_once_with(group, user.userid)
+        group_members_service.member_join.assert_called_once_with(
+            context.group, user.userid
+        )
 
     def test_it_returns_HTTPNoContent_when_add_member_is_successful(
-        self, group, pyramid_request
+        self, context, pyramid_request
     ):
-        resp = views.add_member(group, pyramid_request)
+        resp = views.add_member(context, pyramid_request)
 
         assert isinstance(resp, HTTPNoContent)
 
     def test_it_raises_HTTPNotFound_with_mismatched_user_and_group_authorities(
-        self, factories, pyramid_request
+        self, context, pyramid_request
     ):
-        group = factories.Group(authority="different_authority.com")
+        context.group.authority = "different_authority.com"
 
         with pytest.raises(HTTPNotFound):
-            views.add_member(group, pyramid_request)
+            views.add_member(context, pyramid_request)
 
     def test_it_raises_HTTPNotFound_with_non_existent_user(
-        self, group, pyramid_request, user_service
+        self, context, pyramid_request, user_service
     ):
-
         user_service.fetch.return_value = None
 
         pyramid_request.matchdict["userid"] = "some_user"
 
         with pytest.raises(HTTPNotFound):
-            views.add_member(group, pyramid_request)
+            views.add_member(context, pyramid_request)
 
     def test_it_raises_HTTPNotFound_if_userid_malformed(
-        self, group, pyramid_request, user_service
+        self, context, pyramid_request, user_service
     ):
-
         user_service.fetch.side_effect = ValueError("nope")
 
         pyramid_request.matchdict["userid"] = "invalidformat@wherever"
 
         with pytest.raises(HTTPNotFound):  # view handles ValueError and raises NotFound
-            views.add_member(group, pyramid_request)
+            views.add_member(context, pyramid_request)
 
     def test_it_fetches_user_from_the_request_params(
-        self, group, user, pyramid_request, user_service
+        self, context, user, pyramid_request, user_service
     ):
-        views.add_member(group, pyramid_request)
+        views.add_member(context, pyramid_request)
 
         user_service.fetch.assert_called_once_with(user.userid)
-
-    @pytest.fixture
-    def group(self, factories):
-        return factories.Group(authority="example.com")
 
     @pytest.fixture
     def user(self, factories):
         return factories.User(authority="example.com")
 
     @pytest.fixture
-    def pyramid_request(self, pyramid_request, group, user):
+    def pyramid_request(self, pyramid_request, context, user):
         pyramid_request.matchdict["userid"] = user.userid
-        pyramid_request.matchdict["pubid"] = group.pubid
+        pyramid_request.matchdict["pubid"] = context.group.pubid
         return pyramid_request
 
     @pytest.fixture
@@ -574,20 +421,17 @@ class TestAddMember:
 @pytest.mark.usefixtures("authenticated_userid", "group_members_service")
 class TestRemoveMember:
     def test_it_removes_current_user(
-        self, shorthand_request, authenticated_userid, group_members_service
+        self, context, shorthand_request, authenticated_userid, group_members_service
     ):
-        group = mock.sentinel.group
 
-        views.remove_member(group, shorthand_request)
+        views.remove_member(context, shorthand_request)
 
         group_members_service.member_leave.assert_called_once_with(
-            group, authenticated_userid
+            context.group, authenticated_userid
         )
 
-    def test_it_returns_no_content(self, shorthand_request):
-        group = mock.sentinel.group
-
-        response = views.remove_member(group, shorthand_request)
+    def test_it_returns_no_content(self, context, shorthand_request):
+        response = views.remove_member(context, shorthand_request)
 
         assert isinstance(response, HTTPNoContent)
 
@@ -615,29 +459,10 @@ class TestRemoveMember:
 
 
 @pytest.fixture
-def anonymous_request(pyramid_request):
-    pyramid_request.user = None
-    return pyramid_request
+def group_service(group_service):
+    group_service.fetch.return_value = None
 
-
-@pytest.fixture
-def GroupJSONPresenter(patch):
-    return patch("h.views.api.groups.GroupJSONPresenter")
-
-
-@pytest.fixture
-def GroupsJSONPresenter(patch):
-    return patch("h.views.api.groups.GroupsJSONPresenter")
-
-
-@pytest.fixture
-def UserJSONPresenter(patch):
-    return patch("h.views.api.groups.UserJSONPresenter")
-
-
-@pytest.fixture
-def GroupContext(patch):
-    return patch("h.views.api.groups.GroupContext")
+    return group_service
 
 
 @pytest.fixture
@@ -645,49 +470,16 @@ def CreateGroupAPISchema(patch):
     return patch("h.views.api.groups.CreateGroupAPISchema")
 
 
-@pytest.fixture
-def UpdateGroupAPISchema(patch):
-    return patch("h.views.api.groups.UpdateGroupAPISchema")
+@pytest.fixture(autouse=True)
+def GroupsJSONPresenter(patch):
+    return patch("h.views.api.groups.GroupsJSONPresenter")
+
+
+@pytest.fixture(autouse=True)
+def GroupJSONPresenter(patch):
+    return patch("h.views.api.groups.GroupJSONPresenter")
 
 
 @pytest.fixture
-def group_create_service(pyramid_config):
-    service = mock.create_autospec(GroupCreateService, spec_set=True, instance=True)
-    pyramid_config.register_service(service, name="group_create")
-    return service
-
-
-@pytest.fixture
-def group_update_service(pyramid_config):
-    service = mock.create_autospec(GroupUpdateService, spec_set=True, instance=True)
-    pyramid_config.register_service(service, name="group_update")
-    return service
-
-
-@pytest.fixture
-def group_service(pyramid_config):
-    service = mock.create_autospec(GroupService, spec_set=True, instance=True)
-    service.fetch.return_value = None
-    pyramid_config.register_service(service, name="group")
-    return service
-
-
-@pytest.fixture
-def group_members_service(pyramid_config):
-    service = mock.create_autospec(GroupMembersService, spec_set=True, instance=True)
-    pyramid_config.register_service(service, name="group_members")
-    return service
-
-
-@pytest.fixture
-def group_links_service(pyramid_config):
-    svc = mock.create_autospec(GroupLinksService, spec_set=True, instance=True)
-    pyramid_config.register_service(svc, name="group_links")
-    return svc
-
-
-@pytest.fixture
-def group_list_service(pyramid_config):
-    svc = mock.create_autospec(GroupListService, spec_set=True, instance=True)
-    pyramid_config.register_service(svc, name="group_list")
-    return svc
+def context(factories):
+    return GroupContext(group=factories.Group(creator=factories.User()))

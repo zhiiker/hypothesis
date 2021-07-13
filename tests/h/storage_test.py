@@ -55,43 +55,75 @@ class TestFetchOrderedAnnotations:
 
 
 class TestExpandURI:
-    def test_expand_uri_no_document(self, db_session):
-        actual = storage.expand_uri(db_session, "http://example.com/")
-        assert actual == ["http://example.com/"]
+    @pytest.mark.parametrize(
+        "normalized,expected_uris",
+        (
+            (False, ["http://example.com/"]),
+            (True, ["httpx://example.com"]),
+        ),
+    )
+    def test_expand_uri_no_document(self, db_session, normalized, expected_uris):
+        uris = storage.expand_uri(
+            db_session, "http://example.com/", normalized=normalized
+        )
 
-    def test_expand_uri_document_doesnt_expand_canonical_uris(self, db_session):
+        assert uris == expected_uris
+
+    @pytest.mark.parametrize(
+        "normalized,expected_uris",
+        (
+            (False, ["http://example.com/"]),
+            (True, ["httpx://example.com"]),
+        ),
+    )
+    def test_expand_uri_document_doesnt_expand_canonical_uris(
+        self, db_session, normalized, expected_uris
+    ):
         document = Document(
             document_uris=[
-                DocumentURI(uri="http://foo.com/", claimant="http://example.com"),
-                DocumentURI(uri="http://bar.com/", claimant="http://example.com"),
                 DocumentURI(
                     uri="http://example.com/",
                     type="rel-canonical",
                     claimant="http://example.com",
+                ),
+                DocumentURI(
+                    uri="http://noise.example.com/", claimant="http://example.com"
                 ),
             ]
         )
         db_session.add(document)
         db_session.flush()
 
-        assert storage.expand_uri(db_session, "http://example.com/") == [
-            "http://example.com/"
-        ]
+        uris = storage.expand_uri(
+            db_session, "http://example.com/", normalized=normalized
+        )
 
-    def test_expand_uri_document_uris(self, db_session):
+        assert uris == expected_uris
+
+    @pytest.mark.parametrize(
+        "normalized,expected_uris",
+        (
+            (False, ["http://example.com/", "http://alt.example.com/"]),
+            (True, ["httpx://example.com", "httpx://alt.example.com"]),
+        ),
+    )
+    def test_expand_uri_document_uris(self, db_session, normalized, expected_uris):
         document = Document(
             document_uris=[
-                DocumentURI(uri="http://foo.com/", claimant="http://bar.com"),
-                DocumentURI(uri="http://bar.com/", claimant="http://bar.com"),
+                DocumentURI(uri="http://example.com/", claimant="http://example.com"),
+                DocumentURI(
+                    uri="http://alt.example.com/", claimant="http://example.com"
+                ),
             ]
         )
         db_session.add(document)
         db_session.flush()
 
-        assert storage.expand_uri(db_session, "http://foo.com/") == [
-            "http://foo.com/",
-            "http://bar.com/",
-        ]
+        uris = storage.expand_uri(
+            db_session, "http://alt.example.com/", normalized=normalized
+        )
+
+        assert uris == expected_uris
 
 
 @pytest.mark.usefixtures("models")
@@ -360,7 +392,7 @@ class TestCreateAnnotation:
         )
 
         search_index._queue.add_by_id.assert_called_once_with(
-            annotation.id, tag="storage.create_annotation", schedule_in=180
+            annotation.id, tag="storage.create_annotation", schedule_in=60
         )
 
     def test_it_returns_the_annotation(
@@ -623,7 +655,7 @@ class TestUpdateAnnotation:
         )
 
         search_index._queue.add_by_id.assert_called_once_with(
-            "test_annotation_id", tag="storage.update_annotation", schedule_in=180
+            "test_annotation_id", tag="storage.update_annotation", schedule_in=60
         )
 
     def test_it_returns_the_annotation(

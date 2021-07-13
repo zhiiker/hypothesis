@@ -84,6 +84,12 @@ class SearchIndexService:
             userid, tag, force=force, schedule_in=schedule_in
         )
 
+    def add_group_annotations(self, groupid, tag, force=False, schedule_in=None):
+        """Add all annotations in a group to the search index."""
+        indexer.add_group_annotations.delay(
+            groupid, tag, force=force, schedule_in=schedule_in
+        )
+
     def delete_annotation_by_id(self, annotation_id, refresh=False):
         """
         Mark an annotation as deleted in the search index.
@@ -131,7 +137,7 @@ class SearchIndexService:
 
     def sync(self, limit):
         """Process `limit` sync_annotation jobs from the job queue."""
-        self._queue.sync(limit)
+        return self._queue.sync(limit)
 
     def _index_annotation_body(self, annotation_id, body, refresh, target_index=None):
         self._es.conn.index(

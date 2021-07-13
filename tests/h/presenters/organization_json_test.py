@@ -1,6 +1,5 @@
 import pytest
 
-from h.models.organization import Organization
 from h.presenters.organization_json import OrganizationJSONPresenter
 from h.traversal import OrganizationContext
 
@@ -27,16 +26,19 @@ class TestOrganizationJSONPresenter:
 
         assert presenter.asdict() == {
             "name": "My Org",
-            "id": organization_context.id,
+            "id": organization.pubid,
             "default": False,
             "logo": pyramid_request.route_url(
                 "organization_logo", pubid=organization.pubid
             ),
         }
 
-    def test_default_organization(self, db_session, routes, pyramid_request):
-        organization = Organization.default(db_session)
-        organization_context = OrganizationContext(organization, pyramid_request)
+    def test_default_organization(
+        self, db_session, routes, pyramid_request, default_organization
+    ):
+        organization_context = OrganizationContext(
+            default_organization, pyramid_request
+        )
 
         presenter = OrganizationJSONPresenter(organization_context)
         presented = presenter.asdict()

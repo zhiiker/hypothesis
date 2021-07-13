@@ -39,7 +39,8 @@ describe('FormSelectOnFocusController', () => {
     const input = root.querySelector('input');
     input.focus();
 
-    new FormSelectOnFocusController(document.body);
+    new FormSelectOnFocusController(input);
+
     assert.strictEqual(input.selectionStart, 0);
     assert.strictEqual(input.selectionEnd, input.value.length);
   });

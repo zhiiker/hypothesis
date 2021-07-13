@@ -1,9 +1,10 @@
+from collections import Counter
 from unittest import mock
 from unittest.mock import sentinel
 
 import pytest
-from h_matchers import Any
 
+from h.services.job_queue.metrics import JobQueueMetrics
 from h.tasks import indexer
 
 pytestmark = pytest.mark.usefixtures("search_index")
@@ -55,23 +56,61 @@ class TestAddUsersAnnotations:
         )
 
 
-class TestSyncAnnotations:
+class TestAddGroupAnnotations:
     def test_it(self, search_index):
+        indexer.add_group_annotations(
+            sentinel.groupid,
+            sentinel.tag,
+            force=sentinel.force,
+            schedule_in=sentinel.schedule_in,
+        )
+
+        search_index._queue.add_by_group.assert_called_once_with(
+            sentinel.groupid,
+            sentinel.tag,
+            force=sentinel.force,
+            schedule_in=sentinel.schedule_in,
+        )
+
+
+class TestSyncAnnotations:
+    def test_it(self, newrelic, log, search_index):
         indexer.sync_annotations("test_queue")
 
         search_index.sync.assert_called_once_with("test_queue")
-
-
-class TestReportSyncAnnotationsQueueLength:
-    def test_it(self, newrelic, search_index):
-        indexer.report_sync_annotations_queue_length()
-
-        search_index._queue.count.assert_called_once_with(
-            ["storage.create_annotation", "storage.update_annotation"]
+        log.info.assert_called_once_with(search_index.sync.return_value)
+        newrelic.agent.record_custom_metrics.assert_called_once_with(
+            [
+                ("Custom/SyncAnnotations/Queue/foo", 2),
+                ("Custom/SyncAnnotations/Queue/bar", 3),
+            ]
         )
-        newrelic.agent.record_custom_metric.assert_called_once_with(
-            Any.string(), search_index._queue.count.return_value
+
+    @pytest.fixture
+    def log(self, patch):
+        return patch("h.tasks.indexer.log")
+
+    @pytest.fixture
+    def search_index(self, search_index):
+        search_index.sync.return_value = Counter({"foo": 2, "bar": 3})
+        return search_index
+
+
+class TestReportJobQueueMetrics:
+    def test_it(self, job_queue_metrics, newrelic):
+        indexer.report_job_queue_metrics()
+
+        newrelic.agent.record_custom_metrics.assert_called_once_with(
+            job_queue_metrics.metrics.return_value
         )
+
+    @pytest.fixture(autouse=True)
+    def job_queue_metrics(self, pyramid_config):
+        job_queue_metrics = mock.create_autospec(
+            JobQueueMetrics, spec_set=True, instance=True
+        )
+        pyramid_config.register_service(job_queue_metrics, name="job_queue_metrics")
+        return job_queue_metrics
 
 
 @pytest.fixture(autouse=True)

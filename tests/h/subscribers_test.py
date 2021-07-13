@@ -98,47 +98,44 @@ class TestPublishAnnotationEvent:
         return event
 
 
-@pytest.mark.usefixtures("fetch_annotation")
 class TestSendReplyNotifications:
     def test_it_sends_emails(
         self,
         event,
         pyramid_request,
-        fetch_annotation,
-        get_notification,
-        reply_notification,
-        mailer_task,
+        storage,
+        reply,
+        emails,
+        mailer,
     ):
 
         subscribers.send_reply_notifications(event)
 
         # This is a pure plumbing test, checking everything is connected to
         # everything else as we expect
-        fetch_annotation.assert_called_once_with(
+        storage.fetch_annotation.assert_called_once_with(
             pyramid_request.db, event.annotation_id
         )
-        annotation = fetch_annotation.return_value
-        get_notification.assert_called_once_with(
+        annotation = storage.fetch_annotation.return_value
+        reply.get_notification.assert_called_once_with(
             pyramid_request, annotation, event.action
         )
-        notification = get_notification.return_value
-        reply_notification.generate.assert_called_once_with(
+        notification = reply.get_notification.return_value
+        emails.reply_notification.generate.assert_called_once_with(
             pyramid_request, notification
         )
-        send_params = reply_notification.generate.return_value
-        mailer_task.delay.assert_called_once_with(*send_params)
+        send_params = emails.reply_notification.generate.return_value
+        mailer.send.delay.assert_called_once_with(*send_params)
 
-    def test_it_does_nothing_if_no_notification_is_required(
-        self, event, get_notification, mailer_task
-    ):
-        get_notification.return_value = None
+    def test_it_does_nothing_if_no_notification_is_required(self, event, reply, mailer):
+        reply.get_notification.return_value = None
 
         subscribers.send_reply_notifications(event)
 
-        mailer_task.delay.assert_not_called()
+        mailer.send.delay.assert_not_called()
 
-    def test_it_fails_gracefully_if_the_task_does_not_queue(self, event, mailer_task):
-        mailer_task.side_effect = OperationalError
+    def test_it_fails_gracefully_if_the_task_does_not_queue(self, event, mailer):
+        mailer.send.side_effect = OperationalError
 
         # No explosions please
         subscribers.send_reply_notifications(event)
@@ -146,22 +143,6 @@ class TestSendReplyNotifications:
     @pytest.fixture
     def event(self, pyramid_request):
         return AnnotationEvent(pyramid_request, {"id": "any"}, "action")
-
-    @pytest.fixture(autouse=True)
-    def mailer_task(self, patch):
-        return patch("h.subscribers.mailer.send")
-
-    @pytest.fixture(autouse=True)
-    def fetch_annotation(self, patch):
-        return patch("h.subscribers.storage.fetch_annotation")
-
-    @pytest.fixture(autouse=True)
-    def get_notification(self, patch):
-        return patch("h.subscribers.reply.get_notification")
-
-    @pytest.fixture(autouse=True)
-    def reply_notification(self, patch):
-        return patch("h.subscribers.emails.reply_notification")
 
     @pytest.fixture
     def pyramid_request(self, pyramid_request):
@@ -190,3 +171,28 @@ class TestSyncAnnotation:
             TransactionManager, instance=True, spec_set=True
         )
         return pyramid_request.tm
+
+
+@pytest.fixture(autouse=True)
+def storage(patch):
+    return patch("h.subscribers.storage")
+
+
+@pytest.fixture(autouse=True)
+def reply(patch):
+    return patch("h.subscribers.reply")
+
+
+@pytest.fixture(autouse=True)
+def mailer(patch):
+    return patch("h.subscribers.mailer")
+
+
+@pytest.fixture(autouse=True)
+def emails(patch):
+    return patch("h.subscribers.emails")
+
+
+@pytest.fixture(autouse=True)
+def report_exception(patch):
+    return patch("h.subscribers.report_exception")

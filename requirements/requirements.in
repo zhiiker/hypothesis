@@ -1,6 +1,6 @@
 # Hypothesis packages
-h_pyramid_sentry
-h_matchers
+h-pyramid-sentry
+h-matchers
 h-api
 pyramid-sanity
 
@@ -10,37 +10,38 @@ SQLAlchemy >= 1.1.4
 alembic
 bcrypt
 bleach
-celery >= 4.3
+celery
 certifi  # Required to connect to Elasticsearch over SSL.
 cffi
 click
 deform
-elasticsearch==6.8.1
+elasticsearch==6.8.2
 elasticsearch-dsl==6.3.1
 gevent >= 1.4.0
 gunicorn >= 19.9.0
-hkdf
+importlib_resources
 itsdangerous
 jsonschema
-kombu >= 4.2.1
+kombu
 mistune
 newrelic
 oauthlib
 passlib
 psycogreen
 psycopg2
+pycryptodomex
 pyparsing >= 2.1.5
 pyramid
-pyramid_authsanity >= 1.0.0  # 1.0.0 fixes an IE bug: https://git.io/vH3mi
-pyramid_exclog
-pyramid_layout
+pyramid-authsanity >= 1.0.0  # 1.0.0 fixes an IE bug: https://git.io/vH3mi
+pyramid-exclog
+pyramid-layout
 pyramid-jinja2
 pyramid-services
-pyramid_mailer
-pyramid_retry
-pyramid_tm
+pyramid-mailer
+pyramid-retry
+pyramid-tm
 python-dateutil
-python-slugify < 4.1.0
+python-slugify < 5.1.0
 supervisor >= 4.0.0
 transaction
 venusian

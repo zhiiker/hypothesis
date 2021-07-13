@@ -30,7 +30,7 @@ node {
                                          "-e SITE_PACKAGES=true"
                                          ) {
                 // Test dependencies
-                sh 'apk add --no-cache build-base libffi-dev postgresql-dev python-dev'
+                sh 'apk add --no-cache build-base libffi-dev postgresql-dev'
                 sh 'apk add --no-cache python3 python3-dev'
                 sh 'pip install -q tox>=3.8.0'
 
@@ -55,14 +55,26 @@ node {
 onlyOnMaster {
     milestone()
     stage('qa deploy') {
-        deployApp(image: img, app: 'h', env: 'qa')
+        deployApp(image: img, app: 'h', env: 'qa', region: "us-west-1")
     }
 
     milestone()
-    stage('prod deploy') {
-        input(message: "Deploy to prod?")
-        milestone()
-        deployApp(image: img, app: 'h', env: 'prod')
+    stage("approval") {
+        input(message: "Proceed to production deploy?")
+    }
+
+    milestone()
+    stage("prod Deploy") {
+        parallel(
+            us: {
+                deployApp(image: img, app: "h", env: "prod", region: "us-west-1")
+            },
+            ca: {
+		// Workaround to ensure all parallel builds happen. See https://hypothes-is.slack.com/archives/CR3E3S7K8/p1625041642057400
+                sleep 2
+                deployApp(image: img, app: "h-ca", env: "prod", region: "ca-central-1")
+            }
+        )
     }
 }
 

@@ -16,7 +16,8 @@ from pyramid.request import apply_request_extensions
 from sqlalchemy.orm import sessionmaker
 from webob.multidict import MultiDict
 
-from h import db, models
+from h import db
+from h.models import Organization
 from h.settings import database_url
 from tests.common.fixtures import es_client  # noqa: F401
 from tests.common.fixtures import init_elasticsearch  # noqa: F401
@@ -114,7 +115,11 @@ def db_engine():
 
 @pytest.fixture
 def default_organization(db_session):
-    return models.Organization.default(db_session)
+    # This looks a bit odd, but as part of our DB initialization we always add
+    # a default org. So tests can't add their own without causing a conflict.
+    return (
+        db_session.query(Organization).filter_by(pubid=Organization.DEFAULT_PUBID).one()
+    )
 
 
 @pytest.fixture

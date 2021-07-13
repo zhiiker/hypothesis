@@ -168,6 +168,23 @@ class TestAddUsersAnnotations:
         )
 
 
+class TestAddGroupAnnotations:
+    def test_it(self, indexer, search_index):
+        search_index.add_group_annotations(
+            sentinel.groupid,
+            sentinel.tag,
+            force=sentinel.force,
+            schedule_in=sentinel.schedule_in,
+        )
+
+        indexer.add_group_annotations.delay.assert_called_once_with(
+            sentinel.groupid,
+            sentinel.tag,
+            force=sentinel.force,
+            schedule_in=sentinel.schedule_in,
+        )
+
+
 class TestDeleteAnnotationById:
     @pytest.mark.parametrize("refresh", (True, False))
     def test_delete_annotation(self, search_index, es_client, refresh):
@@ -270,9 +287,10 @@ class TestHandleAnnotationEvent:
 
 class TestSync:
     def test_it(self, search_index, queue):
-        search_index.sync(10)
+        returned = search_index.sync(10)
 
         queue.sync.assert_called_once_with(10)
+        assert returned == queue.sync.return_value
 
 
 @pytest.fixture(autouse=True)

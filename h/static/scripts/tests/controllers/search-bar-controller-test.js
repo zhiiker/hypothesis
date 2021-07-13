@@ -54,7 +54,7 @@ describe('SearchBarController', () => {
       </div>
     `;
 
-    const getItemTitles = function() {
+    const getItemTitles = function () {
       return Array.from(
         dropdown.querySelectorAll('.search-bar__dropdown-menu-title')
       ).map(node => {
@@ -62,7 +62,7 @@ describe('SearchBarController', () => {
       });
     };
 
-    const setup = function() {
+    const setup = function () {
       testEl = document.createElement('div');
       testEl.innerHTML = TEMPLATE;
       document.body.appendChild(testEl);
@@ -73,7 +73,7 @@ describe('SearchBarController', () => {
       dropdown = input.nextSibling;
     };
 
-    const teardown = function() {
+    const teardown = function () {
       document.body.removeChild(testEl);
       const tagsJSON = document.querySelector('.js-tag-suggestions');
       if (tagsJSON) {
@@ -86,7 +86,7 @@ describe('SearchBarController', () => {
       }
     };
 
-    const addTagSuggestions = function() {
+    const addTagSuggestions = function () {
       const suggestions = [
         {
           tag: 'aaaa',
@@ -132,7 +132,7 @@ describe('SearchBarController', () => {
       document.body.appendChild(tagsScript);
     };
 
-    const addGroupSuggestions = function() {
+    const addGroupSuggestions = function () {
       const suggestions = [
         {
           name: 'aaac',
@@ -627,6 +627,9 @@ describe('SearchBarController', () => {
 
     it('should not create a lozenge when the user does not completes a previously incomplete query string and presses the space key', done => {
       const { ctrl, input } = component("'bar");
+
+      // Move cursor to end of field.
+      input.selectionStart = input.value.length;
 
       syn
         .click(input)

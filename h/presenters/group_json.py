@@ -1,72 +1,69 @@
 from h.presenters.organization_json import OrganizationJSONPresenter
+from h.traversal import OrganizationContext
 
 
 class GroupJSONPresenter:
     """Present a group in the JSON format returned by API requests."""
 
-    def __init__(self, group_context):
-        self.context = group_context
-        self.organization_context = self.context.organization
-        self.group = group_context.group
+    def __init__(self, group, request):
+        self.links_service = request.find_service(name="group_links")
+        self.group = group
+
+        if group.organization is None:
+            self.organization_context = None
+        else:
+            self.organization_context = OrganizationContext(group.organization, request)
 
     def asdict(self, expand=None):
-        if expand is None:
-            expand = []
-
-        model = self._model()
-        self._expand(model, expand)
-        model["links"] = self.context.links or {}
-        return model
-
-    def _expand(self, model, expand):
-        if "organization" in expand:
-            if self.organization_context:
-                model["organization"] = OrganizationJSONPresenter(
-                    self.organization_context
-                ).asdict()
-        if "scopes" in expand:
-            model["scopes"] = {}
-            # The API representation of scope enforcement differs from the DB
-            # representation. All groups have an `enforce_scope` property, and
-            # it defaults to True. However, URL enforcement for incoming
-            # annotations only happens if there are 1 or more scopes to restrict
-            # to. Therefore, the API representation of this property is False
-            # if there are no scopes.
-            model["scopes"]["enforced"] = (
-                self.group.enforce_scope if self.group.scopes else False
-            )
-            # At this presentation layer, format scopes to look like
-            # patterns—currently a simple wildcarded prefix—to give us more
-            # flexibility in making scope more granular later
-            model["scopes"]["uri_patterns"] = [
-                scope.scope + "*" for scope in self.group.scopes
-            ]
-        return model
-
-    def _model(self):
-        organization = None
-        if self.organization_context:
-            organization = self.organization_context.id
         model = {
-            "id": self.context.id,
+            "id": self.group.pubid,
+            "links": self.links_service.get_all(self.group) or {},
             "groupid": self.group.groupid,
             "name": self.group.name,
-            "organization": organization,
-            "public": self.group.is_public,  # DEPRECATED: TODO: remove from client
+            "organization": (
+                self.organization_context.organization.pubid
+                if self.organization_context
+                else None
+            ),
+            "public": self.group.is_public,
+            # DEPRECATED: TODO: remove from client
             "scoped": True if self.group.scopes else False,
             "type": self.group.type,
         }
+
+        if expand:
+            self._expand(model, expand)
+
         return model
+
+    def _expand(self, model, expand):
+        if "organization" in expand and self.organization_context:
+            model["organization"] = OrganizationJSONPresenter(
+                self.organization_context
+            ).asdict()
+
+        if "scopes" in expand:
+            model["scopes"] = {
+                # Groups in the DB have an `enforce_scope` property (default
+                # True), but URL enforcement for annotations only happens if
+                # there are scopes to restrict to. So the API value requires
+                # both to be true.
+                "enforced": bool(self.group.enforce_scope and self.group.scopes),
+                # Format scopes to be the scope with a wild-card suffix so we
+                # can make the scopes more granular later.
+                "uri_patterns": [scope.scope + "*" for scope in self.group.scopes],
+            }
 
 
 class GroupsJSONPresenter:
     """Present a list of groups as JSON"""
 
-    def __init__(self, group_contexts):
-        self.contexts = group_contexts
+    def __init__(self, groups, request):
+        self.groups = groups
+        self.request = request
 
     def asdicts(self, expand=None):
         return [
-            GroupJSONPresenter(group_context).asdict(expand=expand)
-            for group_context in self.contexts
+            GroupJSONPresenter(group, self.request).asdict(expand=expand)
+            for group in self.groups
         ]

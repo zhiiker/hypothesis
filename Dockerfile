@@ -1,21 +1,23 @@
-# Stage 1: Build node portion of the H app.
-FROM node:14-alpine as build
+# Stage 1: Build static frontend assets.
+FROM node:16-alpine as build
 
 ENV NODE_ENV production
 
-# Build node dependencies.
+# Install dependencies.
+WORKDIR /tmp/frontend-build
 COPY package-lock.json ./
 COPY package.json ./
 RUN npm ci --production
+RUN npm install --global gulp-cli@2.3.0
 
 # Build h js/css.
-COPY gulpfile.js ./ 
+COPY gulpfile.js ./
 COPY scripts/gulp ./scripts/gulp
 COPY h/static ./h/static
 RUN npm run build
 
 # Stage 2: Build the rest of the app using the build output from Stage 1.
-FROM python:3.6.9-alpine3.10
+FROM python:3.8.11-alpine3.13
 LABEL maintainer="Hypothes.is Project and contributors"
 
 # Install system build and runtime dependencies.
@@ -30,7 +32,7 @@ RUN addgroup -S hypothesis && adduser -S -G hypothesis -h /var/lib/hypothesis hy
 WORKDIR /var/lib/hypothesis
 
 # Ensure nginx state and log directories writeable by unprivileged user.
-RUN chown -R hypothesis:hypothesis /var/log/nginx /var/lib/nginx /var/tmp/nginx
+RUN chown -R hypothesis:hypothesis /var/log/nginx /var/lib/nginx
 
 # Copy nginx config
 COPY conf/nginx.conf /etc/nginx/nginx.conf
@@ -48,7 +50,7 @@ RUN apk add --no-cache --virtual build-deps \
   && apk del build-deps
 
 # Copy frontend assets.
-COPY --from=build /build build
+COPY --from=build /tmp/frontend-build/build build
 
 # Copy the rest of the application files.
 COPY . .

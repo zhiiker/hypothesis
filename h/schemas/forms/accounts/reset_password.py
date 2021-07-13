@@ -1,5 +1,6 @@
 import colander
 import deform
+import pytz
 from itsdangerous import BadData, SignatureExpired
 
 from h import i18n, models
@@ -10,7 +11,6 @@ _ = i18n.TranslationString
 
 
 class ResetCode(colander.SchemaType):
-
     """Schema type transforming a reset code to a user and back."""
 
     def serialize(self, node, appstruct):
@@ -30,7 +30,7 @@ class ResetCode(colander.SchemaType):
         serializer = request.registry.password_reset_serializer
 
         try:
-            (username, timestamp) = serializer.loads(
+            username, timestamp = serializer.loads(
                 cstruct, max_age=72 * 3600, return_timestamp=True
             )
         except SignatureExpired:
@@ -45,8 +45,18 @@ class ResetCode(colander.SchemaType):
         )
         if user is None:
             raise colander.Invalid(node, _("Your reset code is not valid"))
-        if user.password_updated is not None and timestamp < user.password_updated:
-            raise colander.Invalid(node, _("This reset code has already been used."))
+
+        if user.password_updated is not None:
+            # The timestamp here is timezone aware, and our dates in the DB are
+            # not. This means we can't compare them. We are going to assume
+            # that our DB dates are UTC and set the timezone for comparison.
+            password_updated = user.password_updated.replace(tzinfo=pytz.UTC)
+
+            if timestamp < password_updated:
+                raise colander.Invalid(
+                    node, _("This reset code has already been used.")
+                )
+
         return user
 
 

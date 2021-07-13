@@ -6,7 +6,6 @@ from h import form  # noqa F401
 from h import i18n, models, paginator
 from h.models.annotation import Annotation
 from h.models.group_scope import GroupScope
-from h.models.organization import Organization
 from h.schemas.forms.admin.group import AdminGroupSchema
 
 _ = i18n.TranslationString
@@ -45,7 +44,9 @@ class GroupCreateViews:
         self.group_members_svc = self.request.find_service(name="group_members")
 
         self.organizations = {o.pubid: o for o in self.list_org_svc.organizations()}
-        self.default_org_id = Organization.default(self.request.db).pubid
+        self.default_org_id = (
+            self.request.find_service(name="organization").get_default().pubid
+        )
 
         self.schema = AdminGroupSchema().bind(
             request=request, organizations=self.organizations, user_svc=self.user_svc
@@ -129,7 +130,7 @@ class GroupCreateViews:
 )
 class GroupEditViews:
     def __init__(self, context, request):
-        self.group = context
+        self.group = context.group
         self.request = request
 
         self.list_org_svc = request.find_service(name="list_organizations")
@@ -156,12 +157,10 @@ class GroupEditViews:
 
     @view_config(request_method="POST", route_name="admin.groups_delete")
     def delete(self):
-        group = self.group
-        svc = self.request.find_service(name="delete_group")
+        self.request.find_service(name="delete_group").delete(self.group)
 
-        svc.delete(group)
         self.request.session.flash(
-            _("Successfully deleted group %s" % (group.name), "success"),
+            _("Successfully deleted group %s" % (self.group.name), "success"),
             queue="success",
         )
 

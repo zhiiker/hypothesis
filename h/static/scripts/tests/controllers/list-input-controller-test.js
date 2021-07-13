@@ -40,6 +40,6 @@ describe('ListInputController', () => {
     const removeBtn = ctrl.element.querySelector('li > button');
     removeBtn.click();
 
-    assert.equal(itemCount(ctrl), 1);
+    assert.equal(itemCount(ctrl), 0);
   });
 });
